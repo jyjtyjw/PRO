@@ -1,0 +1,707 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BARSA DEBBARMA // Visual Artist & 3D Creator</title>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            engine: {
+              bg: '#030712',
+              card: '#0b1329',
+              cyan: '#38bdf8',
+              violet: '#a855f7',
+              emerald: '#10b981',
+              pink: '#ec4899',
+            }
+          },
+          fontFamily: {
+            orbitron: ['Orbitron', 'sans-serif'],
+            rajdhani: ['Rajdhani', 'sans-serif']
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800;900&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- Three.js Library -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+  <style>
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #030712;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #1e293b;
+      border: 1px solid #38bdf8;
+      border-radius: 3px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #38bdf8;
+    }
+
+    /* Glassmorphism Unreal/Unity Cards */
+    .hud-card {
+      background: rgba(11, 19, 41, 0.65);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(56, 189, 248, 0.2);
+      box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.7);
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      position: relative;
+    }
+
+    .hud-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(56, 189, 248, 0.6), transparent);
+    }
+
+    .hud-card:hover {
+      border-color: rgba(56, 189, 248, 0.7);
+      box-shadow: 0 0 25px rgba(56, 189, 248, 0.25), inset 0 0 15px rgba(56, 189, 248, 0.05);
+      transform: translateY(-4px);
+    }
+
+    /* HUD Corner Crosshairs */
+    .hud-corner-tl { position: absolute; top: -1px; left: -1px; width: 8px; height: 8px; border-top: 2px solid #38bdf8; border-left: 2px solid #38bdf8; }
+    .hud-corner-tr { position: absolute; top: -1px; right: -1px; width: 8px; height: 8px; border-top: 2px solid #38bdf8; border-right: 2px solid #38bdf8; }
+    .hud-corner-bl { position: absolute; bottom: -1px; left: -1px; width: 8px; height: 8px; border-bottom: 2px solid #38bdf8; border-left: 2px solid #38bdf8; }
+    .hud-corner-br { position: absolute; bottom: -1px; right: -1px; width: 8px; height: 8px; border-bottom: 2px solid #38bdf8; border-right: 2px solid #38bdf8; }
+
+    /* Glowing Text FX */
+    .glow-cyan { text-shadow: 0 0 12px rgba(56, 189, 248, 0.7); }
+    .glow-violet { text-shadow: 0 0 12px rgba(168, 85, 247, 0.7); }
+
+    /* Interactive Background Canvas */
+    #canvas-container {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    /* Scanline effect */
+    .scanline {
+      background: linear-gradient(
+        to bottom,
+        rgba(255,255,255,0),
+        rgba(255,255,255,0) 50%,
+        rgba(0, 0, 0, 0.25) 50%,
+        rgba(0, 0, 0, 0.25)
+      );
+      background-size: 100% 4px;
+    }
+  </style>
+</head>
+<body class="bg-engine-bg text-slate-200 font-rajdhani selection:bg-cyan-500 selection:text-slate-950 relative overflow-x-hidden min-h-screen">
+
+  <!-- Three.js Canvas Layer -->
+  <div id="canvas-container"></div>
+  
+  <!-- Subtle CRT Scanline HUD Overlay -->
+  <div class="fixed inset-0 pointer-events-none z-10 scanline opacity-30"></div>
+
+  <!-- UI Overlay Container -->
+  <div class="relative z-20 flex flex-col min-h-screen">
+
+    <!-- HUD Header Navbar -->
+    <header class="w-full px-4 md:px-8 py-3 flex justify-between items-center border-b border-cyan-500/20 bg-slate-950/80 backdrop-blur-md sticky top-0 z-50">
+      <div class="flex items-center gap-3">
+        <div class="relative flex h-3 w-3">
+          <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
+          <span class="relative inline-flex rounded-full h-3 w-3 bg-cyan-500"></span>
+        </div>
+        <div>
+          <span class="font-orbitron font-extrabold tracking-widest text-white text-base md:text-lg glow-cyan">BARSA DEBBARMA</span>
+          <span class="hidden sm:inline-block text-[10px] text-cyan-400/80 font-orbitron ml-2 tracking-wider">// CREATIVE ENGINE 5.4</span>
+        </div>
+      </div>
+
+      <nav class="hidden lg:flex gap-6 font-orbitron text-xs tracking-wider text-slate-300">
+        <a href="#overview" class="hover:text-cyan-400 transition-colors py-1 flex items-center gap-1.5"><span class="text-cyan-500">01.</span> OVERVIEW</a>
+        <a href="#skills" class="hover:text-cyan-400 transition-colors py-1 flex items-center gap-1.5"><span class="text-cyan-500">02.</span> SKILLSET</a>
+        <a href="#experience" class="hover:text-cyan-400 transition-colors py-1 flex items-center gap-1.5"><span class="text-cyan-500">03.</span> EXPERIENCE LOGS</a>
+        <a href="#education" class="hover:text-cyan-400 transition-colors py-1 flex items-center gap-1.5"><span class="text-cyan-500">04.</span> EDUCATION</a>
+        <a href="#contact" class="hover:text-cyan-400 transition-colors py-1 flex items-center gap-1.5"><span class="text-cyan-500">05.</span> CONTACT</a>
+      </nav>
+
+      <div class="flex items-center gap-3">
+        <div class="hidden md:flex flex-col text-right font-orbitron text-[10px] text-slate-400">
+          <span class="text-emerald-400 font-bold">SYSTEM: ONLINE</span>
+          <span>FPS: 60.0 // LATENCY: 2ms</span>
+        </div>
+        <a href="#contact" class="font-orbitron text-xs px-3 py-1.5 border border-cyan-500/50 bg-cyan-500/10 hover:bg-cyan-500 hover:text-slate-950 text-cyan-300 rounded font-semibold transition-all">
+          DEPLOY
+        </a>
+      </div>
+    </header>
+
+    <!-- Main Content Stream -->
+    <main class="container mx-auto px-4 md:px-8 flex-grow space-y-24 py-12">
+
+      <!-- SECTION 01: HERO / OVERVIEW -->
+      <section id="overview" class="min-h-[85vh] flex flex-col justify-center items-start pt-6">
+        <div class="hud-card p-6 md:p-10 rounded-xl max-w-4xl w-full">
+          <div class="hud-corner-tl"></div>
+          <div class="hud-corner-tr"></div>
+          <div class="hud-corner-bl"></div>
+          <div class="hud-corner-br"></div>
+
+          <div class="flex items-center gap-2 mb-4">
+            <span class="px-2.5 py-1 text-[11px] font-orbitron font-semibold tracking-wider text-cyan-400 bg-cyan-950/80 border border-cyan-500/40 rounded">
+              VISUAL ARTIST & 3D CREATOR
+            </span>
+            <span class="px-2.5 py-1 text-[11px] font-orbitron font-semibold tracking-wider text-emerald-400 bg-emerald-950/80 border border-emerald-500/40 rounded flex items-center gap-1.5">
+              <span class="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse"></span> FREE TO WORK
+            </span>
+          </div>
+
+          <h1 class="font-orbitron text-4xl sm:text-6xl md:text-7xl font-black text-white tracking-tight leading-none mb-4 glow-cyan">
+            BARSA DEBBARMA
+          </h1>
+
+          <h2 class="text-xl sm:text-2xl text-cyan-300 font-semibold mb-6 flex flex-wrap items-center gap-2">
+            <span>Video Editor</span>
+            <span class="text-slate-600">•</span>
+            <span>3D Art & Motion Designer</span>
+            <span class="text-slate-600">•</span>
+            <span>UI/UX Designer</span>
+          </h2>
+
+          <p class="text-base sm:text-lg text-slate-300 leading-relaxed mb-8 max-w-2xl font-normal">
+            Creative visual artist specializing in video editing, 3D art, motion design, and digital graphics. Skilled at turning complex concepts into immersive visual narratives, dynamic cinematic motion, and polished interactive experiences.
+          </p>
+
+          <div class="flex flex-wrap items-center gap-6 text-sm text-slate-400 mb-8 border-t border-b border-slate-800 py-3">
+            <div class="flex items-center gap-2">
+              <svg class="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+              <span>Greater Bengaluru Area, India</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <svg class="w-4 h-4 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 002-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+              <span>debbarmabarsa5@gmail.com</span>
+            </div>
+          </div>
+
+          <div class="flex flex-wrap gap-4 font-orbitron text-xs">
+            <a href="#contact" class="px-6 py-3 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold rounded transition-all shadow-lg shadow-cyan-500/20 flex items-center gap-2">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+              INITIATE CONTACT
+            </a>
+            <a href="https://www.linkedin.com/in/barsa200511" target="_blank" rel="noopener font-bold" class="px-6 py-3 border border-slate-700 hover:border-cyan-400 text-slate-200 hover:text-white rounded transition-all bg-slate-900/50 flex items-center gap-2">
+              <svg class="w-4 h-4 text-cyan-400" fill="currentColor" viewBox="0 0 24 24"><path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/></svg>
+              LINKEDIN PROFILE
+            </a>
+          </div>
+        </div>
+      </section>
+
+      <!-- SECTION 02: SKILLSET MATRIX -->
+      <section id="skills" class="space-y-6">
+        <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+          <h2 class="font-orbitron text-2xl md:text-3xl font-bold text-white flex items-center gap-3">
+            <span class="text-cyan-400 text-sm font-normal">// 02.</span> SKILLSET MATRIX & TOOLKIT
+          </h2>
+          <span class="text-xs font-orbitron text-slate-500">CAPABILITIES LOG</span>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          
+          <!-- Card 1 -->
+          <div class="hud-card p-6 rounded-xl border-t-2 border-t-cyan-400">
+            <div class="hud-corner-tl"></div>
+            <div class="hud-corner-br"></div>
+            <div class="flex items-center justify-between mb-4">
+              <h3 class="font-orbitron font-bold text-white text-base">Video & Post</h3>
+              <svg class="w-6 h-6 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+            </div>
+            <ul class="space-y-2.5 text-slate-300 text-sm">
+              <li class="flex items-center justify-between"><span class="flex items-center gap-2"><span class="w-1.5 h-1.5 bg-cyan-400 rounded-full"></span> Adobe Premiere Pro</span> <span class="text-xs font-orbitron text-cyan-400">ADVANCED</span></li>
+              <li class="flex items-center justify-between"><span class="flex items-center gap-2"><span class="w-1.5 h-1.5 bg-cyan-400 rounded-full"></span> After Effects</span> <span class="text-xs font-orbitron text-cyan-400">ADVANCED</span></li>
+              <li class="flex items-center justify-between"><span class="flex items-center gap-2"><span class="w-1.5 h-1.5 bg-cyan-400 rounded-full"></span> Video Editing</span> <span class="text-xs font-orbitron text-slate-400">EXPERT</span></li>
+              <li class="flex items-center justify-between"><span class="flex items-center gap-2"><span class="w-1.5 h-1.5 bg-cyan-400 rounded-full"></span> Motion Design</span> <span class="text-xs font-orbitron text-slate-400">CORE</span></li>
+              <li class="flex items-center justify-between"><span class="flex items-center gap-2"><span class="w-1.5 h-1.5 bg-cyan-400 rounded-full"></span> Colour Grading</span> <span class="text-xs font-orbitron text-slate-400">CORE</span></li>
+            </ul>
+          </div>
+
+          <!-- Card 2 -->
+          <div class="hud-card p-6 rounded-xl border-t-2 border-t-violet-400">
+            <div class="hud-corner-tl"></div>
+            <div class="hud-corner-br"></div>
+            <div class="flex items-center justify-between mb-4">
+              <h3 class="font-orbitron font-bold text-white text-base">3D Art & Visuals</h3>
+              <svg class="w-6 h-6 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M14 10l-2 1m0 0l-2-1m2 1v2.5M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+            </div>
+            <ul class="space-y-2.5 text-slate-300 text-sm">
+              <li class="flex items-center justify-between"><span class="flex items-center gap-2"><span class="w-1.5 h-1.5 bg-violet-400 rounded-full"></span> 3D Design & Modeling</span> <span class="text-xs font-orbitron text-violet-400">CORE</span></li>
+              <li class="flex items-center justify-between"><span class="flex items-center gap-2"><span class="w-1.5 h-1.5 bg-violet-400 rounded-full"></span> Game Media Graphics</span> <span class="text-xs font-orbitron text-violet-400">CORE</span></li>
+              <li class="flex items-center justify-between"><span class="flex items-center gap-2"><span class="w-1.5 h-1.5 bg-violet-400 rounded-full"></span> Digital Media Art</span> <span class="text-xs font-orbitron text-slate-400">CREATIVE</span></li>
+              <li class="flex items-center justify-between"><span class="flex items-center gap-2"><span class="w-1.5 h-1.5 bg-violet-400 rounded-full"></span> Photography</span> <span class="text-xs font-orbitron text-slate-400">EXPERT</span></li>
+              <li class="flex items-center justify-between"><span class="flex items-center gap-2"><span class="w-1.5 h-1.5 bg-violet-400 rounded-full"></span> Photo Retouching</span> <span class="text-xs font-orbitron text-slate-400">EXPERT</span></li>
+            </ul>
+          </div>
+
+          <!-- Card 3 -->
+          <div class="hud-card p-6 rounded-xl border-t-2 border-t-pink-400">
+            <div class="hud-corner-tl"></div>
+            <div class="hud-corner-br"></div>
+            <div class="flex items-center justify-between mb-4">
+              <h3 class="font-orbitron font-bold text-white text-base">Design & UI/UX</h3>
+              <svg class="w-6 h-6 text-pink-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"/></svg>
+            </div>
+            <ul class="space-y-2.5 text-slate-300 text-sm">
+              <li class="flex items-center justify-between"><span class="flex items-center gap-2"><span class="w-1.5 h-1.5 bg-pink-400 rounded-full"></span> Graphic Design</span> <span class="text-xs font-orbitron text-pink-400">EXPERT</span></li>
+              <li class="flex items-center justify-between"><span class="flex items-center gap-2"><span class="w-1.5 h-1.5 bg-pink-400 rounded-full"></span> Figma</span> <span class="text-xs font-orbitron text-pink-400">PROFICIENT</span></li>
+              <li class="flex items-center justify-between"><span class="flex items-center gap-2"><span class="w-1.5 h-1.5 bg-pink-400 rounded-full"></span> Adobe Photoshop</span> <span class="text-xs font-orbitron text-slate-400">ADVANCED</span></li>
+              <li class="flex items-center justify-between"><span class="flex items-center gap-2"><span class="w-1.5 h-1.5 bg-pink-400 rounded-full"></span> User Experience (UX)</span> <span class="text-xs font-orbitron text-slate-400">CORE</span></li>
+              <li class="flex items-center justify-between"><span class="flex items-center gap-2"><span class="w-1.5 h-1.5 bg-pink-400 rounded-full"></span> Print Design</span> <span class="text-xs font-orbitron text-slate-400">CORE</span></li>
+            </ul>
+          </div>
+
+          <!-- Card 4 -->
+          <div class="hud-card p-6 rounded-xl border-t-2 border-t-emerald-400">
+            <div class="hud-corner-tl"></div>
+            <div class="hud-corner-br"></div>
+            <div class="flex items-center justify-between mb-4">
+              <h3 class="font-orbitron font-bold text-white text-base">Languages</h3>
+              <svg class="w-6 h-6 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129"/></svg>
+            </div>
+            <ul class="space-y-2.5 text-slate-300 text-sm">
+              <li class="flex items-center justify-between"><span class="flex items-center gap-2"><span class="w-1.5 h-1.5 bg-emerald-400 rounded-full"></span> English</span> <span class="text-xs font-orbitron text-emerald-400">FULL PROF.</span></li>
+              <li class="flex items-center justify-between"><span class="flex items-center gap-2"><span class="w-1.5 h-1.5 bg-emerald-400 rounded-full"></span> Hindi</span> <span class="text-xs font-orbitron text-emerald-400">FULL PROF.</span></li>
+              <li class="flex items-center justify-between"><span class="flex items-center gap-2"><span class="w-1.5 h-1.5 bg-emerald-400 rounded-full"></span> Kokborok</span> <span class="text-xs font-orbitron text-slate-400">NATIVE</span></li>
+              <li class="flex items-center justify-between"><span class="flex items-center gap-2"><span class="w-1.5 h-1.5 bg-emerald-400 rounded-full"></span> Bengali</span> <span class="text-xs font-orbitron text-slate-400">NATIVE</span></li>
+            </ul>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- SECTION 03: EXPERIENCE LOGS -->
+      <section id="experience" class="space-y-6">
+        <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+          <h2 class="font-orbitron text-2xl md:text-3xl font-bold text-white flex items-center gap-3">
+            <span class="text-cyan-400 text-sm font-normal">// 03.</span> WORK EXPERIENCE LOGS
+          </h2>
+          <span class="text-xs font-orbitron text-slate-500">CAREER SEQUENCE</span>
+        </div>
+
+        <div class="relative border-l-2 border-slate-800 ml-4 md:ml-6 space-y-8 pl-6 md:pl-8">
+
+          <!-- Item 1 -->
+          <div class="relative group">
+            <div class="absolute -left-[31px] md:-left-[39px] top-1.5 w-4 h-4 bg-slate-950 border-2 border-cyan-400 rounded-full group-hover:scale-125 transition-all"></div>
+            
+            <div class="hud-card p-6 rounded-xl">
+              <div class="hud-corner-tl"></div>
+              <div class="hud-corner-br"></div>
+              
+              <div class="flex flex-col md:flex-row md:items-center justify-between gap-2 mb-3">
+                <div>
+                  <h3 class="font-orbitron text-xl font-bold text-white group-hover:text-cyan-400 transition-colors">Video Editor Intern</h3>
+                  <p class="text-slate-400 font-medium">Two Cents Studio • <span class="text-slate-300">Delhi, India</span></p>
+                </div>
+                <span class="font-orbitron text-xs text-cyan-400 bg-cyan-950/60 border border-cyan-500/30 px-3 py-1 rounded w-fit">
+                  MAY 2026 – JUNE 2026
+                </span>
+              </div>
+
+              <p class="text-slate-300 text-base leading-relaxed mb-4">
+                Collaborated as a Video Editor Intern on commercial video projects, motion visual assets, and high-quality video assembly.
+              </p>
+
+              <div class="flex flex-wrap gap-2 text-xs font-orbitron">
+                <span class="px-2 py-0.5 bg-slate-900 border border-slate-700 text-slate-300 rounded">Adobe Premiere Pro</span>
+                <span class="px-2 py-0.5 bg-slate-900 border border-slate-700 text-slate-300 rounded">After Effects</span>
+                <span class="px-2 py-0.5 bg-slate-900 border border-slate-700 text-slate-300 rounded">Motion Graphics</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Item 2 -->
+          <div class="relative group">
+            <div class="absolute -left-[31px] md:-left-[39px] top-1.5 w-4 h-4 bg-slate-950 border-2 border-violet-400 rounded-full group-hover:scale-125 transition-all"></div>
+            
+            <div class="hud-card p-6 rounded-xl">
+              <div class="hud-corner-tl"></div>
+              <div class="hud-corner-br"></div>
+              
+              <div class="flex flex-col md:flex-row md:items-center justify-between gap-2 mb-3">
+                <div>
+                  <h3 class="font-orbitron text-xl font-bold text-white group-hover:text-violet-400 transition-colors">Graphic Designer Intern</h3>
+                  <p class="text-slate-400 font-medium">Advasi • <span class="text-slate-300">Andhra Pradesh, India</span></p>
+                </div>
+                <span class="font-orbitron text-xs text-violet-400 bg-violet-950/60 border border-violet-500/30 px-3 py-1 rounded w-fit">
+                  APRIL 2026 – MAY 2026
+                </span>
+              </div>
+
+              <p class="text-slate-300 text-base leading-relaxed mb-4">
+                Spearheaded graphic design layouts and print design assets, producing cohesive UI elements and high-impact visual artwork.
+              </p>
+
+              <div class="flex flex-wrap gap-2 text-xs font-orbitron">
+                <span class="px-2 py-0.5 bg-slate-900 border border-slate-700 text-slate-300 rounded">Figma</span>
+                <span class="px-2 py-0.5 bg-slate-900 border border-slate-700 text-slate-300 rounded">Photoshop</span>
+                <span class="px-2 py-0.5 bg-slate-900 border border-slate-700 text-slate-300 rounded">Print Design</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Item 3 -->
+          <div class="relative group">
+            <div class="absolute -left-[31px] md:-left-[39px] top-1.5 w-4 h-4 bg-slate-950 border-2 border-emerald-400 rounded-full group-hover:scale-125 transition-all"></div>
+            
+            <div class="hud-card p-6 rounded-xl">
+              <div class="hud-corner-tl"></div>
+              <div class="hud-corner-br"></div>
+              
+              <div class="flex flex-col md:flex-row md:items-center justify-between gap-2 mb-3">
+                <div>
+                  <h3 class="font-orbitron text-xl font-bold text-white group-hover:text-emerald-400 transition-colors">Freelance Video & Photo Editor</h3>
+                  <p class="text-slate-400 font-medium">Independent Client Operations • <span class="text-slate-300">Perth, WA (Remote)</span></p>
+                </div>
+                <span class="font-orbitron text-xs text-emerald-400 bg-emerald-950/60 border border-emerald-500/30 px-3 py-1 rounded w-fit">
+                  JAN 2025 – JAN 2026
+                </span>
+              </div>
+
+              <p class="text-slate-300 text-base leading-relaxed mb-4">
+                Managed end-to-end video editing pipelines and photo retouching for commercial clients across international regions.
+              </p>
+
+              <div class="flex flex-wrap gap-2 text-xs font-orbitron">
+                <span class="px-2 py-0.5 bg-slate-900 border border-slate-700 text-slate-300 rounded">Remote Work</span>
+                <span class="px-2 py-0.5 bg-slate-900 border border-slate-700 text-slate-300 rounded">Photo Retouching</span>
+                <span class="px-2 py-0.5 bg-slate-900 border border-slate-700 text-slate-300 rounded">Color Grading</span>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- SECTION 04: EDUCATION LOG -->
+      <section id="education" class="space-y-6">
+        <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+          <h2 class="font-orbitron text-2xl md:text-3xl font-bold text-white flex items-center gap-3">
+            <span class="text-cyan-400 text-sm font-normal">// 04.</span> ACADEMIC EDUCATION LOG
+          </h2>
+          <span class="text-xs font-orbitron text-slate-500">QUALIFICATIONS</span>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+          <!-- Degree 1 -->
+          <div class="hud-card p-6 rounded-xl">
+            <div class="hud-corner-tl"></div>
+            <div class="hud-corner-br"></div>
+
+            <div class="flex items-center justify-between mb-3">
+              <span class="font-orbitron text-xs text-cyan-400 bg-cyan-950/80 px-2.5 py-1 rounded border border-cyan-500/30">
+                BACHELOR DEGREE
+              </span>
+              <span class="font-orbitron text-xs text-slate-400">JULY 2024 – JUNE 2027</span>
+            </div>
+
+            <h3 class="font-orbitron text-xl font-bold text-white mb-1">Bachelor of Vocation (B.Voc)</h3>
+            <p class="text-cyan-300 font-semibold mb-3">Digital Media and Animation</p>
+            <p class="text-slate-400 text-sm mb-4">St. Joseph's University, Bengaluru</p>
+            
+            <p class="text-slate-300 text-sm leading-relaxed">
+              Curriculum focused on 3D computer graphics, motion media, digital design theory, visual effects composition, and video editing frameworks.
+            </p>
+          </div>
+
+          <!-- Degree 2 -->
+          <div class="hud-card p-6 rounded-xl">
+            <div class="hud-corner-tl"></div>
+            <div class="hud-corner-br"></div>
+
+            <div class="flex items-center justify-between mb-3">
+              <span class="font-orbitron text-xs text-violet-400 bg-violet-950/80 px-2.5 py-1 rounded border border-violet-500/30">
+                HIGH SCHOOL DIPLOMA
+              </span>
+              <span class="font-orbitron text-xs text-slate-400">APRIL 2011 – MARCH 2024</span>
+            </div>
+
+            <h3 class="font-orbitron text-xl font-bold text-white mb-1">High School Diploma</h3>
+            <p class="text-violet-300 font-semibold mb-3">Business & Commerce</p>
+            <p class="text-slate-400 text-sm mb-4">Auxilium Girls School, Agartala</p>
+
+            <p class="text-slate-300 text-sm leading-relaxed">
+              Foundation studies with emphasis on commerce, communication, artistic fundamentals, and visual problem solving.
+            </p>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- SECTION 05: TERMINAL CONTACT -->
+      <section id="contact" class="space-y-6 pb-12">
+        <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+          <h2 class="font-orbitron text-2xl md:text-3xl font-bold text-white flex items-center gap-3">
+            <span class="text-cyan-400 text-sm font-normal">// 05.</span> TRANSMIT COMMUNICATION
+          </h2>
+          <span class="text-xs font-orbitron text-slate-500">TERMINAL ACTIVE</span>
+        </div>
+
+        <div class="hud-card p-6 md:p-8 rounded-xl max-w-4xl mx-auto">
+          <div class="hud-corner-tl"></div>
+          <div class="hud-corner-tr"></div>
+          <div class="hud-corner-bl"></div>
+          <div class="hud-corner-br"></div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div>
+              <h3 class="font-orbitron text-2xl font-extrabold text-white mb-3 glow-cyan">INITIATE CONNECTION</h3>
+              <p class="text-slate-300 text-sm mb-6 leading-relaxed">
+                Interested in booking 3D artwork, video editing, motion design projects, or full-time opportunities? Send a message directly through the terminal console.
+              </p>
+
+              <div class="space-y-4 text-sm font-orbitron">
+                <div class="flex items-center gap-3 text-slate-300 p-3 bg-slate-900/60 border border-slate-800 rounded">
+                  <svg class="w-5 h-5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 002-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                  <span>debbarmabarsa5@gmail.com</span>
+                </div>
+                <div class="flex items-center gap-3 text-slate-300 p-3 bg-slate-900/60 border border-slate-800 rounded">
+                  <svg class="w-5 h-5 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 002-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                  <span>shefalidebbarma008@gmail.com</span>
+                </div>
+                <a href="https://www.linkedin.com/in/barsa200511" target="_blank" class="flex items-center gap-3 text-slate-300 p-3 bg-slate-900/60 border border-slate-800 rounded hover:border-cyan-400 transition-colors">
+                  <svg class="w-5 h-5 text-cyan-400" fill="currentColor" viewBox="0 0 24 24"><path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/></svg>
+                  <span>linkedin.com/in/barsa200511</span>
+                </a>
+              </div>
+            </div>
+
+            <form onsubmit="event.preventDefault(); triggerTerminalSend();" class="space-y-4">
+              <div>
+                <label class="block font-orbitron text-xs text-slate-400 mb-1">// IDENTIFIER NAME</label>
+                <input type="text" required placeholder="User / Recruiter Name" class="w-full bg-slate-950 border border-slate-700 focus:border-cyan-400 rounded px-3 py-2 text-sm text-slate-200 outline-none transition-colors font-rajdhani" />
+              </div>
+              <div>
+                <label class="block font-orbitron text-xs text-slate-400 mb-1">// RETURN ADDRESS EMAIL</label>
+                <input type="email" required placeholder="name@domain.com" class="w-full bg-slate-950 border border-slate-700 focus:border-cyan-400 rounded px-3 py-2 text-sm text-slate-200 outline-none transition-colors font-rajdhani" />
+              </div>
+              <div>
+                <label class="block font-orbitron text-xs text-slate-400 mb-1">// MESSAGE TRANSMISSION</label>
+                <textarea rows="4" required placeholder="Type your inquiry or project scope here..." class="w-full bg-slate-950 border border-slate-700 focus:border-cyan-400 rounded px-3 py-2 text-sm text-slate-200 outline-none transition-colors font-rajdhani"></textarea>
+              </div>
+              
+              <button id="send-btn" type="submit" class="w-full font-orbitron font-bold text-xs py-3 bg-cyan-500 hover:bg-cyan-400 text-slate-950 rounded transition-all shadow-lg shadow-cyan-500/20">
+                SEND TRANSMISSION
+              </button>
+              <div id="status-msg" class="hidden font-orbitron text-xs text-center text-emerald-400 mt-2">
+                [ TRANSMISSION SENT SUCCESSFULLY ]
+              </div>
+            </form>
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="w-full py-6 text-center text-slate-500 text-xs font-orbitron border-t border-slate-900 bg-slate-950/90">
+      <p>© 2026 BARSA DEBBARMA // THREE.JS 3D ENGINE ONLINE</p>
+    </footer>
+
+  </div>
+
+  <script>
+    /* Custom Message Box replace alert */
+    function triggerTerminalSend() {
+      const btn = document.getElementById('send-btn');
+      const msg = document.getElementById('status-msg');
+      btn.innerText = 'TRANSMITTING...';
+      btn.classList.add('opacity-50');
+      
+      setTimeout(() => {
+        btn.innerText = 'SEND TRANSMISSION';
+        btn.classList.remove('opacity-50');
+        msg.classList.remove('hidden');
+        setTimeout(() => msg.classList.add('hidden'), 4000);
+      }, 1000);
+    }
+
+    // --- THREE.JS HIGH-END UNREAL / UNITY GAMING BACKGROUND ---
+    window.addEventListener('load', function() {
+      const container = document.getElementById('canvas-container');
+      
+      // Scene
+      const scene = new THREE.Scene();
+      scene.fog = new THREE.FogExp2(0x030712, 0.035);
+
+      // Camera
+      const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+      camera.position.set(0, 2, 9);
+
+      // WebGL Renderer
+      const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 1.2;
+      container.appendChild(renderer.domElement);
+
+      // --- LIGHTING ---
+      const ambientLight = new THREE.AmbientLight(0x0f172a, 2.0);
+      scene.add(ambientLight);
+
+      // Volumetric Glowing Point Lights (Cyan & Magenta)
+      const cyanLight = new THREE.PointLight(0x38bdf8, 6, 25);
+      cyanLight.position.set(4, 4, 3);
+      scene.add(cyanLight);
+
+      const purpleLight = new THREE.PointLight(0xa855f7, 6, 25);
+      purpleLight.position.set(-4, -2, 2);
+      scene.add(purpleLight);
+
+      // --- GEOMETRY OBJECTS ---
+
+      // 1. Unreal Cyber Perspective Grid Floor
+      const gridHelper = new THREE.GridHelper(80, 80, 0x38bdf8, 0x1e293b);
+      gridHelper.position.y = -3;
+      scene.add(gridHelper);
+
+      // 2. Central Floating Artifact (Morphing Complex Torus Knot)
+      const knotGeo = new THREE.TorusKnotGeometry(1.6, 0.4, 128, 32);
+      const knotMat = new THREE.MeshStandardMaterial({
+        color: 0x0f172a,
+        wireframe: true,
+        emissive: 0x38bdf8,
+        emissiveIntensity: 0.4,
+        roughness: 0.1,
+        metalness: 0.9
+      });
+      const artifactMesh = new THREE.Mesh(knotGeo, knotMat);
+      artifactMesh.position.set(3.5, 0.5, -2);
+      scene.add(artifactMesh);
+
+      // Inner Glowing Core Sphere
+      const coreGeo = new THREE.IcosahedronGeometry(0.8, 2);
+      const coreMat = new THREE.MeshBasicMaterial({
+        color: 0xa855f7,
+        wireframe: true
+      });
+      const coreMesh = new THREE.Mesh(coreGeo, coreMat);
+      artifactMesh.add(coreMesh);
+
+      // 3. Floating Interactive Starfield / Particle Dust
+      const particleCount = 800;
+      const particleGeo = new THREE.BufferGeometry();
+      const posArray = new Float32Array(particleCount * 3);
+
+      for (let i = 0; i < particleCount * 3; i += 3) {
+        posArray[i] = (Math.random() - 0.5) * 35;
+        posArray[i + 1] = (Math.random() - 0.5) * 35;
+        posArray[i + 2] = (Math.random() - 0.5) * 35;
+      }
+
+      particleGeo.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
+      
+      const particleMat = new THREE.PointsMaterial({
+        size: 0.05,
+        color: 0x38bdf8,
+        transparent: true,
+        opacity: 0.7,
+        blending: THREE.AdditiveBlending
+      });
+
+      const particleSystem = new THREE.Points(particleGeo, particleMat);
+      scene.add(particleSystem);
+
+      // --- MOUSE SENSITIVITY & PARALLAX ---
+      let mouseX = 0;
+      let mouseY = 0;
+      let targetX = 0;
+      let targetY = 0;
+
+      const windowHalfX = window.innerWidth / 2;
+      const windowHalfY = window.innerHeight / 2;
+
+      document.addEventListener('mousemove', (event) => {
+        mouseX = (event.clientX - windowHalfX) / 100;
+        mouseY = (event.clientY - windowHalfY) / 100;
+      });
+
+      // Touch Parallax Support
+      document.addEventListener('touchmove', (event) => {
+        if (event.touches.length > 0) {
+          mouseX = (event.touches[0].clientX - windowHalfX) / 100;
+          mouseY = (event.touches[0].clientY - windowHalfY) / 100;
+        }
+      });
+
+      // --- ANIMATION LOOP ---
+      const clock = new THREE.Clock();
+
+      function animate() {
+        requestAnimationFrame(animate);
+
+        const elapsedTime = clock.getElapsedTime();
+
+        // Smooth camera lerp tracking cursor
+        targetX += (mouseX - targetX) * 0.04;
+        targetY += (mouseY - targetY) * 0.04;
+
+        camera.position.x = targetX * 0.6;
+        camera.position.y = 2 - (targetY * 0.6);
+        camera.lookAt(0, 0, 0);
+
+        // Rotate 3D Artifact
+        artifactMesh.rotation.x = elapsedTime * 0.3;
+        artifactMesh.rotation.y = elapsedTime * 0.4;
+        artifactMesh.position.y = Math.sin(elapsedTime * 1.5) * 0.3 + 0.5;
+
+        coreMesh.rotation.x = -elapsedTime * 0.6;
+        coreMesh.rotation.z = elapsedTime * 0.5;
+
+        // Animate Grid Floor Movement (Scrolling grid effect)
+        gridHelper.position.z = (elapsedTime * 1.5) % 1;
+
+        // Particle Rotation
+        particleSystem.rotation.y = elapsedTime * 0.02;
+
+        // Dynamic Light Oscillations
+        cyanLight.intensity = 4 + Math.sin(elapsedTime * 2.5) * 2;
+        purpleLight.intensity = 4 + Math.cos(elapsedTime * 2.0) * 2;
+
+        renderer.render(scene, camera);
+      }
+
+      // Execute render loop
+      animate();
+
+      // --- RESPONSIVE RESIZE ---
+      window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      });
+    });
+  </script>
+</body>
+</html>
